@@ -1,18 +1,24 @@
 # Homelab
 
-A personal devops playground running on Ubuntu 24.04.
+My personal homelab journey. This repo documents everything I'm learning and building along the way.
 
 ## Purpose
 
-This repo documents my devops learning journey. The homelab server serves as a sandbox for experimenting with:
+A sandbox for experimenting with:
 - Containerization (Docker, Docker Compose)
 - Infrastructure as Code
 - Automation and CI/CD
 - Self-hosted services
+- Object storage
+- And whatever else catches my interest
 
 ## Structure
 
 - `docs/` - Setup guides and learning notes
+
+## Services
+
+- [MinIO AIStor Object Storage](docs/minio-aistor.md) - Enterprise object storage deployment
 
 ## Getting Started
 
