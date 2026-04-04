@@ -139,7 +139,7 @@ brew install minio/stable/mc
 ### Configure alias
 
 ```bash
-mc alias set myminio http://localhost:9000 jimoney kayole12A
+mc alias set myminio http://localhost:9000 <user> <password>
 ```
 
 Replace `localhost:9000` with your actual endpoint if not using port forwarding.
