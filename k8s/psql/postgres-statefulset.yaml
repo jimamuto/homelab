@@ -17,6 +17,9 @@ spec:
       containers:
         - name: postgres
           image: postgres:16
+          envFrom:
+            - configMapRef:
+                name: postgres-config
           ports:
             - containerPort: 5432
           env:
