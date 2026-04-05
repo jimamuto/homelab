@@ -1,228 +1,183 @@
-# PostgreSQL on Kubernetes Deployment Guide
+# PostgreSQL on Kubernetes
 
-This guide documents the steps to deploy PostgreSQL on Kubernetes using StatefulSet for persistence.
+This directory deploys PostgreSQL as a single-replica `StatefulSet` with persistent storage and internal services for stable discovery inside the cluster.
 
-## Prerequisites
-- Kubernetes cluster - kubectl configured to access the cluster
+The manifests also include backup-related environment values pointing at the MinIO service in this repo, so this is not just a generic database deployment. It is wired for the homelab stack here.
 
-## Deployment Steps
+## Files
 
-### 1. Create Namespace
-Create a dedicated namespace for PostgreSQL resources:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: postgres
+```text
+psql/
+├── README.md
+├── appdb_backup.sql
+├── kustomization.yaml
+├── namespace.yaml
+├── postgres-configmap.yaml
+├── postgres-pvc.yaml
+├── postgres-services.yaml
+└── postgres-statefulset.yaml
 ```
 
-Apply:
-```bash
-kubectl apply -f namespace.yaml
-```
+## What Gets Created
 
-### 2. Create Secret and ConfigMap
-Create a Secret for passwords and a ConfigMap for non-sensitive settings:
+- Namespace: `postgres`
+- Workload: `StatefulSet/postgres`
+- Image: `postgres:16`
+- Storage: `20Gi` PVC named `postgres-pvc`
+- Services:
+  - `postgres-headless` for stable identity
+  - `postgres` as the internal client service
+- Secret dependency: `postgres-auth`
+- ConfigMap: `postgres-config`
+
+Current config values from [postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml):
+
+- `POSTGRES_DB=appdb`
+- `POSTGRES_USER=appuser`
+- `AWS_ENDPOINT=http://minio.minio.svc.cluster.local:9000`
+- `AWS_REGION=us-east-1`
+- `BACKUP_BUCKET=postgres-backups`
+
+## Required Secret
+
+Create the `postgres-auth` secret in the `postgres` namespace before deployment.
+
+Required key:
+
+- `POSTGRES_PASSWORD`
+
+Example:
 
 ```bash
+kubectl create namespace postgres --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic postgres-auth \
-  --namespace postgres \
-  --from-literal=POSTGRES_PASSWORD='ReplaceWithStrongPassword'
+  -n postgres \
+  --from-literal=POSTGRES_PASSWORD='<strong-password>'
 ```
 
-ConfigMap (postgres-configmap.yaml):
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: postgres-config
-  namespace: postgres
-data:
-  POSTGRES_DB: appdb
-  POSTGRES_USER: appuser
-```
+## Deploy
 
-Apply:
+From the repo root:
+
 ```bash
-kubectl apply -f postgres-configmap.yaml
+kubectl apply -k psql
 ```
 
-### 3. Create Persistent Storage
-Create a PersistentVolumeClaim for storage:
+Or from this directory:
 
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-pvc
-  namespace: postgres
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 20Gi
-```
-
-Apply and verify:
 ```bash
-kubectl apply -f postgres-pvc.yaml
+kubectl apply -k .
+```
+
+## Verify
+
+```bash
+kubectl get pods -n postgres
+kubectl get svc -n postgres
 kubectl get pvc -n postgres
-```
-
-### 4. Create Services
-Create a headless service for stable network identity and a ClusterIP service for client access:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-headless
-  namespace: postgres
-spec:
-  clusterIP: None
-  selector:
-    app: postgres
-  ports:
-    - name: postgres
-      port: 5432
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres
-  namespace: postgres
-spec:
-  type: ClusterIP
-  selector:
-    app: postgres
-  ports:
-    - name: postgres
-      port: 5432
-      targetPort: 5432
-```
-
-Apply:
-```bash
-kubectl apply -f postgres-services.yaml
-```
-
-### 5. Deploy PostgreSQL with StatefulSet
-Deploy PostgreSQL using a StatefulSet:
-
-```yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: postgres
-  namespace: postgres
-spec:
-  serviceName: postgres-headless
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-        - name: postgres
-          image: postgres:16
-          ports:
-            - containerPort: 5432
-          env:
-            - name: POSTGRES_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: postgres-config
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: postgres-config
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-auth
-                  key: POSTGRES_PASSWORD
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "1"
-              memory: "1Gi"
-          readinessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-            initialDelaySeconds: 10
-            periodSeconds: 5
-          livenessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          volumeMounts:
-            - name: postgres-storage
-              mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: postgres-storage
-          persistentVolumeClaim:
-            claimName: postgres-pvc
-```
-
-Apply and verify:
-```bash
-kubectl apply -f postgres-statefulset.yaml
-kubectl get pods -n postgres -l app=postgres
 kubectl get statefulset -n postgres
 ```
 
-### 6. Verify Persistence
-Test connectivity and verify data persistence:
+Inspect the pod if needed:
 
 ```bash
-# Get pod name
-POD_NAME=$(kubectl get pods -n postgres -l app=postgres \
-  -o jsonpath='{.items[0].metadata.name}')
-echo "$POD_NAME"
+kubectl describe pod -n postgres -l app=postgres
+kubectl logs -n postgres -l app=postgres
+```
 
-# Connect to PostgreSQL
-kubectl exec -it -n postgres "$POD_NAME" -- \
-  psql -U appuser -d appdb
+## Connect
 
-# Inside psql, run:
+Port-forward the service:
+
+```bash
+kubectl port-forward svc/postgres -n postgres 5432:5432
+```
+
+Then connect locally with your normal PostgreSQL client using:
+
+- host: `localhost`
+- port: `5432`
+- database: `appdb`
+- user: `appuser`
+
+Or open a shell in the running pod:
+
+```bash
+kubectl exec -it -n postgres statefulset/postgres -- psql -U appuser -d appdb
+```
+
+## Persistence Check
+
+A quick persistence test:
+
+```bash
+kubectl exec -it -n postgres statefulset/postgres -- psql -U appuser -d appdb
+```
+
+Then run:
+
+```sql
 CREATE TABLE IF NOT EXISTS healthcheck (
   id serial PRIMARY KEY,
   status text NOT NULL
 );
 INSERT INTO healthcheck (status) VALUES ('ok');
 SELECT count(*) FROM healthcheck;
-
-# Exit psql, then delete pod
-kubectl delete pod -n postgres "$POD_NAME"
-kubectl get pods -n postgres -l app=postgres -w
-
-# After pod recreates, reconnect and verify
-NEW_POD_NAME=$(kubectl get pods -n postgres -l app=postgres \
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -it -n postgres "$NEW_POD_NAME" -- \
-  psql -U appuser -d appdb -c "SELECT count(*) FROM healthcheck;"
 ```
 
-If the row count persists, your storage is correctly configured.
+Delete the pod:
+
+```bash
+kubectl delete pod -n postgres -l app=postgres
+kubectl get pods -n postgres -w
+```
+
+Reconnect and verify the row count is still there.
+
+## Kustomize Contents
+
+[kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml) includes:
+
+- [namespace.yaml](/home/jimoney/homelab/k8s/psql/namespace.yaml)
+- [postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml)
+- [postgres-pvc.yaml](/home/jimoney/homelab/k8s/psql/postgres-pvc.yaml)
+- [postgres-services.yaml](/home/jimoney/homelab/k8s/psql/postgres-services.yaml)
+- [postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml)
 
 ## Notes
-- Storage class used: `local-path` (adjust based on your cluster's available storage classes)
-- Resource requests/limits can be adjusted based on workload requirements
+
+- Storage class is `local-path`
+- Resource requests are `250m` CPU and `512Mi` memory
+- Resource limits are `1` CPU and `1Gi` memory
+- Readiness and liveness probes both use `pg_isready`
+- The checked-in [appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup artifact currently stored in this directory
+
+## Troubleshooting
+
+Secret missing:
+
+```bash
+kubectl get secret postgres-auth -n postgres
+```
+
+PVC not binding:
+
+```bash
+kubectl describe pvc postgres-pvc -n postgres
+```
+
+Pod not ready:
+
+```bash
+kubectl describe pod -n postgres -l app=postgres
+kubectl logs -n postgres -l app=postgres
+```
+
+Service discovery test from another pod:
+
+```bash
+kubectl run psql-debug --rm -it --restart=Never \
+  --image=postgres:16 \
+  -n postgres \
+  -- psql -h postgres -U appuser -d appdb
+```

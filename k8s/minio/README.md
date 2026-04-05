@@ -1,221 +1,152 @@
 # MinIO on Kubernetes
 
-Deploy MinIO object storage as a plain StatefulSet — no operator overhead.
+This directory deploys MinIO as a plain single-node `StatefulSet` with persistent storage and two services:
 
-## Architecture
+- `minio` as the internal `ClusterIP` service
+- `minio-loadbalancer` as the external `LoadBalancer` service
 
-```mermaid
-graph TB
-    subgraph "Host Machine"
-        Browser["Browser"]
-        MC["mc CLI"]
-    end
+It is a small, direct setup for homelab use. No operator, no extra control plane components, just the manifests needed to run MinIO.
 
-    subgraph "Lima VM (k3s)"
-        subgraph "Namespace: minio"
-            LB["Service: minio-loadbalancer\nType: LoadBalancer\nExternal IP: 192.168.5.15"]
+## Files
 
-            subgraph "StatefulSet: minio"
-                Pod["Pod: minio-0\nContainer: minio\nIP: 10.42.0.x"]
-            end
-
-            Secret["Secret: minio-env\n(MINIO_ROOT_USER, MINIO_ROOT_PASSWORD)"]
-            PVC["PVC: data-minio-0\n25Gi (local-path)"]
-        end
-
-        subgraph "Namespace: kube-system"
-            svclb["svclb-minio-loadbalancer\n(DaemonSet - routes traffic)"]
-            coredns["CoreDNS\n(DNS resolution)"]
-        end
-    end
-
-    Browser -->|"http://localhost:9001"| Pod
-    MC -->|"http://localhost:9000"| Pod
-    LB -->|"port 9000 → 9000\nport 9001 → 9001"| Pod
-    svclb -->|"routes external IP\nto pod via NodePort"| Pod
-    Secret -->|"envFrom: secretRef"| Pod
-    Pod -->|"mounts /data"| PVC
-    coredns -->|"cluster DNS"| Pod
-
-    style Pod fill:#e1f5e1
-    style LB fill:#fff3cd
-    style Secret fill:#f8d7da
-    style PVC fill:#d1ecf1
-    style svclb fill:#e2e3f1
-```
-
-## How Traffic Flows
-
-```
-Browser (host) → localhost:9001 → kubectl port-forward → Pod:9001 (Console)
-mc CLI (host)  → localhost:9000 → kubectl port-forward → Pod:9000 (API)
-```
-
-The LoadBalancer external IP (`192.168.5.15`) exists but is **not reachable from the host** because the Lima VM runs on an isolated network. Use `kubectl port-forward` instead.
-
-## File Structure
-
-```
+```text
 minio/
-├── deployment.yaml      # Namespace + StatefulSet
-├── loadbalancer.yaml    # LoadBalancer service
-├── secrets.yaml         # Credentials (gitignored - DO NOT commit)
-├── .gitignore
-└── README.md
+├── README.md
+├── deployment.yaml
+├── kustomization.yaml
+├── loadbalancer.yaml
+└── namespace.yaml
 ```
 
-## Prerequisites
+## What Gets Created
 
-- A running Kubernetes cluster (k3s, kind, minikube, etc.)
-- `kubectl` configured and connected to your cluster
-- A `local-path` StorageClass (or update `storageClassName` in `deployment.yaml`)
+- Namespace: `minio`
+- Workload: `StatefulSet/minio`
+- Image: `quay.io/minio/minio:RELEASE.2024-10-02T17-50-41Z`
+- Storage: `25Gi` PVC from `volumeClaimTemplates`
+- Ports:
+  - `9000` for the S3 API
+  - `9001` for the web console
+- Secret dependency: `minio-env`
 
-## Setup
+The main container is configured with:
 
-### 1. Configure credentials
+```text
+minio server /data --console-address :9001
+```
 
-Edit `secrets.yaml` and update with your credentials:
+## Required Secret
 
-- `MINIO_ROOT_USER` — MinIO admin username
-- `MINIO_ROOT_PASSWORD` — MinIO admin password
+Create the `minio-env` secret in the `minio` namespace before applying the manifests.
 
-### 2. Deploy MinIO
+Required keys:
+
+- `MINIO_ROOT_USER`
+- `MINIO_ROOT_PASSWORD`
+
+Example:
 
 ```bash
-kubectl apply -f secrets.yaml
-kubectl apply -f deployment.yaml
-kubectl apply -f loadbalancer.yaml
+kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic minio-env \
+  -n minio \
+  --from-literal=MINIO_ROOT_USER='<user>' \
+  --from-literal=MINIO_ROOT_PASSWORD='<password>'
 ```
 
-### 3. Verify deployment
+## Deploy
+
+From the repo root:
+
+```bash
+kubectl apply -k minio
+```
+
+Or from this directory:
+
+```bash
+kubectl apply -k .
+```
+
+## Verify
 
 ```bash
 kubectl get pods -n minio
 kubectl get svc -n minio
+kubectl get statefulset -n minio
 ```
 
-Wait until the pod shows `1/1 Ready`.
-
-## Accessing MinIO
-
-### Via Port Forward (recommended for local dev)
-
-```bash
-kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000 9001:9001
-```
-
-- **Console**: `http://localhost:9001`
-- **API (S3)**: `http://localhost:9000`
-
-### Via LoadBalancer External IP (from inside the VM only)
-
-```bash
-kubectl get svc minio-loadbalancer -n minio
-```
-
-- **Console**: `http://<EXTERNAL-IP>:9001`
-- **API (S3)**: `http://<EXTERNAL-IP>:9000`
-
-> **Note**: The external IP is on the Lima VM's isolated network and is not reachable from the host machine. Use port-forwarding instead.
-
-### Via NodePort (from inside the VM only)
-
-- **Console**: `http://<NODE-IP>:31404`
-- **API (S3)**: `http://<NODE-IP>:30461`
-
-## Using the MinIO Client (mc)
-
-### Install mc
-
-```bash
-# Linux
-curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-chmod +x /usr/local/bin/mc
-
-# macOS
-brew install minio/stable/mc
-```
-
-### Configure alias
-
-```bash
-mc alias set myminio http://localhost:9000 <user> <password>
-```
-
-Replace `localhost:9000` with your actual endpoint if not using port forwarding.
-
-### Common commands
-
-```bash
-mc ls myminio                           # List buckets
-mc mb myminio/mybucket                  # Create a bucket
-mc cp file.txt myminio/mybucket         # Upload a file
-mc cp myminio/mybucket/file.txt .       # Download a file
-mc rm myminio/mybucket/file.txt         # Delete a file
-mc admin info myminio                   # Server info
-mc admin user list myminio              # List users
-mc policy set download myminio/mybucket # Make bucket publicly readable
-```
-
-## Troubleshooting
-
-### Pod not ready
+Inspect the pod if it is not ready:
 
 ```bash
 kubectl describe pod -n minio -l app=minio
 kubectl logs -n minio -l app=minio
 ```
 
-### Pod crashes with "parity validation" error
+## Access
 
-This happens when `MINIO_STORAGE_CLASS_STANDARD` is set to `EC:2` but you only have 1 drive. Erasure coding requires at least 3 drives.
-
-**Fix**: Remove `MINIO_STORAGE_CLASS_STANDARD` from `secrets.yaml`, delete the secret and PVC, then redeploy:
+For local admin access, port-forwarding is the safest default:
 
 ```bash
-kubectl delete secret minio-env -n minio
-kubectl delete pvc -n minio --all
-kubectl delete pv -l app=minio --all 2>/dev/null
-rm -rf /home/jimoney/minio/data/.minio.sys  # wipe persisted config
-kubectl apply -f secrets.yaml
-kubectl apply -f deployment.yaml
+kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000 9001:9001
 ```
 
-### "Client sent an HTTP request to an HTTPS server"
+Endpoints:
 
-This happens when using port 9443 — browsers auto-upgrade to HTTPS. The console is now on port 9001 (HTTP) to avoid this.
+- Console: `http://localhost:9001`
+- API: `http://localhost:9000`
 
-**Fix**: Use `http://localhost:9001` instead of `https://localhost:9443`.
-
-### No external IP on LoadBalancer
-
-Some clusters (kind, minikube, bare-metal) don't support LoadBalancer out of the box. Use port forwarding instead.
-
-### Node instability / pods restarting
-
-On resource-constrained VMs (8GB RAM), pods may restart due to memory pressure. Reduce cluster footprint:
+If your cluster exposes `LoadBalancer` services cleanly on your network, you can also use:
 
 ```bash
-kubectl scale deployment metrics-server -n kube-system --replicas=0
+kubectl get svc minio-loadbalancer -n minio
 ```
 
-### Reset deployment
+Then connect to:
+
+- `http://<external-ip>:9001`
+- `http://<external-ip>:9000`
+
+Whether the external IP is reachable depends on the cluster and host networking. If it is not, use port-forwarding.
+
+## Kustomize Contents
+
+[kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml) includes:
+
+- [namespace.yaml](/home/jimoney/homelab/k8s/minio/namespace.yaml)
+- [deployment.yaml](/home/jimoney/homelab/k8s/minio/deployment.yaml)
+- [loadbalancer.yaml](/home/jimoney/homelab/k8s/minio/loadbalancer.yaml)
+
+## Notes
+
+- Storage class is set to `local-path`
+- The workload uses a single replica, which fits homelab and local persistence use
+- Readiness and liveness probes hit MinIO health endpoints on port `9000`
+- The internal service name other workloads can use is `minio.minio.svc.cluster.local:9000`
+
+## Troubleshooting
+
+No pod:
 
 ```bash
-kubectl delete -f loadbalancer.yaml
-kubectl delete -f deployment.yaml
-kubectl delete -f secrets.yaml
-kubectl delete namespace minio
+kubectl get events -n minio --sort-by=.lastTimestamp
 ```
 
-Then re-apply from step 2.
+Secret missing:
 
-## What Was Avoided
+```bash
+kubectl get secret minio-env -n minio
+```
 
-This setup deliberately **does not use the MinIO Operator** because:
+PVC not binding:
 
-- The operator adds ~256Mi RAM overhead (operator pod + sidecar container)
-- On a single-node, 8GB RAM system, every MB counts
-- The operator caused connectivity issues with `requestAutoCert: true` (self-signed certs only valid for internal DNS)
-- With `requestAutoCert: false`, the operator bound MinIO to `127.0.0.1` only, breaking all external access
-- A plain StatefulSet is simpler, uses fewer resources, and works reliably for homelab use
+```bash
+kubectl get pvc -n minio
+kubectl describe pvc -n minio
+```
+
+Service reachable in cluster but not from your machine:
+
+- check the `EXTERNAL-IP` on `minio-loadbalancer`
+- confirm your cluster supports `LoadBalancer`
+- fall back to `kubectl port-forward`
