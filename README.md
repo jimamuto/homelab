@@ -1,83 +1,42 @@
 # Homelab
 
-This repo is the working notes and infrastructure for a small homelab environment.
+Personal infrastructure for self-hosted services, automation, and media management.
 
-Right now it has two main tracks:
+## What's Running
 
-- base server setup and tooling notes in `docs/`
-- Kubernetes manifests for the data stack in `k8s/`
+| Service | Purpose | Port |
+|---------|---------|------|
+| Kavita | Digital library for manga/comics | 5000 |
+| MinIO | S3-compatible object storage | 9000/9001 |
+| PostgreSQL | Database for apps | 5432 |
+| n8n | Workflow automation | 5678 |
 
-## Repo Layout
+## Quick Start
 
-```text
-.
-├── README.md
-├── docs/
-│   ├── minio-aistor.md
-│   └── setup.md
-└── k8s/
-    ├── README.md
-    ├── kustomization.yaml
-    ├── kavita/
-    ├── minio/
-    └── psql/
-```
-
-## What Is Here
-
-### Docs
-
-- [docs/setup.md](/home/jimoney/homelab/docs/setup.md) covers the Ubuntu server bootstrap, SSH setup, Docker installation, GitHub CLI auth, and a few common issues
-- [docs/minio-aistor.md](/home/jimoney/homelab/docs/minio-aistor.md) documents a Docker-based MinIO AIStor deployment
-
-### Kubernetes
-
-- [k8s/README.md](/home/jimoney/homelab/k8s/README.md) is the entry point for the Kubernetes side of the repo
-- [k8s/kavita/README.md](/home/jimoney/homelab/k8s/kavita/README.md) documents the Kavita manifests
-- [k8s/minio/README.md](/home/jimoney/homelab/k8s/minio/README.md) documents the MinIO manifests
-- [k8s/psql/README.md](/home/jimoney/homelab/k8s/psql/README.md) documents the PostgreSQL manifests
-
-The current Kubernetes stack is centered on:
-
-- Kavita for digital library management
-- MinIO for S3-compatible object storage
-- PostgreSQL for application data and backups
-- Kustomize to deploy either service independently or the full stack together
-
-## Common Entry Points
-
-Read the server setup notes:
-
-```bash
-sed -n '1,200p' docs/setup.md
-```
-
-Preview the Kubernetes stack:
-
-```bash
-kubectl kustomize k8s
-```
-
-Deploy the full Kubernetes stack:
-
+Deploy everything:
 ```bash
 kubectl apply -k k8s
 ```
 
-Deploy one service only:
-
+Deploy one service:
 ```bash
 kubectl apply -k k8s/kavita
-kubectl apply -k k8s/minio
-kubectl apply -k k8s/psql
+kubectl apply -k k8n/n8n
 ```
 
-## Current Focus
+## Access Services
 
-This repo is no longer just a generic homelab scratchpad. The concrete infrastructure checked in today is:
+```bash
+kubectl port-forward svc/kavita -n kavita 5000:5000     # http://localhost:5000
+kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000 9001:9001  # API:9000, Console:9001
+kubectl port-forward svc/postgres -n postgres 5432:5432
+kubectl port-forward svc/n8n -n n8n 5678:5678          # http://localhost:5678
+```
 
-- host setup documentation under `docs/`
-- Kavita, MinIO, and PostgreSQL Kubernetes manifests under `k8s/`
-- a Docker-based MinIO AIStor reference doc under `docs/`
+## What's Next
 
-If you are looking for the actively maintained manifests, start with [k8s/README.md](/home/jimoney/homelab/k8s/README.md).
+- Add qBittorrent for automated downloads
+- Connect RSS feeds → n8n → qBittorrent → Kavita workflow
+- Set up automated library scanning
+
+See [k8s/README.md](k8s/README.md) for full details.

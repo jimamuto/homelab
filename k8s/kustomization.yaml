@@ -5,3 +5,4 @@ resources:
   - kavita
   - minio
   - psql
+  - n8n

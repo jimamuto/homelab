@@ -1,6 +1,6 @@
 # Homelab Data Stack on Kubernetes
 
-This repo is the Kubernetes layer for a small homelab data stack: MinIO for S3-compatible object storage, PostgreSQL for app data and backups, and Kavita for self-hosted digital library management.
+This repo is the Kubernetes layer for a small homelab data stack: MinIO for S3-compatible object storage, PostgreSQL for app data and backups, Kavita for self-hosted digital library management, and n8n for workflow automation.
 
 It is intentionally simple:
 
@@ -43,6 +43,13 @@ kubectl apply -k psql
 │   ├── kustomization.yaml
 │   ├── loadbalancer.yaml
 │   └── namespace.yaml
+├── n8n/
+│   ├── deployment.yaml
+│   ├── kustomization.yaml
+│   ├── loadbalancer.yaml
+│   ├── namespace.yaml
+│   ├── pvc.yaml
+│   └── service.yaml
 └── psql/
     ├── README.md
     ├── appdb_backup.sql
@@ -99,13 +106,25 @@ kubectl apply -k psql
   - backup bucket: `postgres-backups`
   - MinIO endpoint: `http://minio.minio.svc.cluster.local:9000`
 
+### n8n
+
+- Namespace: `n8n`
+- Workload: single-replica `Deployment`
+- Image: `n8nio/n8n:latest`
+- Storage: `1Gi` via `local-path`
+- Access:
+  - internal `ClusterIP` service: `n8n`
+  - external `LoadBalancer` service: `n8n-lb`
+  - app port: `5678`
+
 ## How The Pieces Fit Together
 
-The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes three service-level kustomizations:
+The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes four service-level kustomizations:
 
 - [kavita/kustomization.yaml](/home/jimoney/homelab/k8s/kavita/kustomization.yaml)
 - [minio/kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml)
 - [psql/kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml)
+- [n8n/kustomization.yaml](/home/jimoney/homelab/k8s/n8n/kustomization.yaml)
 
 That means you can:
 
@@ -113,6 +132,7 @@ That means you can:
 - deploy the library service only with `kubectl apply -k kavita`
 - deploy storage only with `kubectl apply -k minio`
 - deploy database only with `kubectl apply -k psql`
+- deploy automation only with `kubectl apply -k n8n`
 
 Operationally, PostgreSQL is already wired to know about MinIO through [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml), which includes the in-cluster MinIO endpoint and backup bucket name.
 
@@ -179,6 +199,9 @@ kubectl get svc -n minio
 kubectl get pods -n postgres
 kubectl get svc -n postgres
 kubectl get pvc -n postgres
+kubectl get pods -n n8n
+kubectl get svc -n n8n
+kubectl get pvc -n n8n
 ```
 
 Access MinIO locally:
@@ -208,6 +231,16 @@ Connect to PostgreSQL from inside the cluster or by port-forwarding:
 kubectl port-forward svc/postgres -n postgres 5432:5432
 ```
 
+Access n8n locally:
+
+```bash
+kubectl port-forward svc/n8n -n n8n 5678:5678
+```
+
+Then open:
+
+- `http://localhost:5678`
+
 ## Files Worth Knowing
 
 - [kavita/deployment.yaml](/home/jimoney/homelab/k8s/kavita/deployment.yaml) defines the Kavita workload and its persistent mounts for config and library data
@@ -217,6 +250,8 @@ kubectl port-forward svc/postgres -n postgres 5432:5432
 - [psql/postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml) defines the PostgreSQL pod, probes, resources, and mounted storage
 - [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml) contains the database defaults plus MinIO backup settings
 - [psql/appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup currently stored in the repo
+- [n8n/deployment.yaml](/home/jimoney/homelab/k8s/n8n/deployment.yaml) defines the n8n workflow automation workload
+- [n8n/pvc.yaml](/home/jimoney/homelab/k8s/n8n/pvc.yaml) provisions the PVC for n8n workflow data
 
 ## Service Docs
 
