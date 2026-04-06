@@ -1,0 +1,11 @@
+services:
+  mangadex-downloader:
+    image: mansuf/mangadex-downloader:latest-optional
+    container_name: mangadex-downloader
+    volumes:
+      - ./downloads:/downloads
+    restart: "no"
+
+# Usage:
+#   ./download.sh
+#   (then paste your MangaDex URL)
