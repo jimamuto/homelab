@@ -18,6 +18,7 @@ Right now it has two main tracks:
 └── k8s/
     ├── README.md
     ├── kustomization.yaml
+    ├── kavita/
     ├── minio/
     └── psql/
 ```
@@ -32,11 +33,13 @@ Right now it has two main tracks:
 ### Kubernetes
 
 - [k8s/README.md](/home/jimoney/homelab/k8s/README.md) is the entry point for the Kubernetes side of the repo
+- [k8s/kavita/README.md](/home/jimoney/homelab/k8s/kavita/README.md) documents the Kavita manifests
 - [k8s/minio/README.md](/home/jimoney/homelab/k8s/minio/README.md) documents the MinIO manifests
 - [k8s/psql/README.md](/home/jimoney/homelab/k8s/psql/README.md) documents the PostgreSQL manifests
 
 The current Kubernetes stack is centered on:
 
+- Kavita for digital library management
 - MinIO for S3-compatible object storage
 - PostgreSQL for application data and backups
 - Kustomize to deploy either service independently or the full stack together
@@ -64,6 +67,7 @@ kubectl apply -k k8s
 Deploy one service only:
 
 ```bash
+kubectl apply -k k8s/kavita
 kubectl apply -k k8s/minio
 kubectl apply -k k8s/psql
 ```
@@ -73,7 +77,7 @@ kubectl apply -k k8s/psql
 This repo is no longer just a generic homelab scratchpad. The concrete infrastructure checked in today is:
 
 - host setup documentation under `docs/`
-- MinIO and PostgreSQL Kubernetes manifests under `k8s/`
+- Kavita, MinIO, and PostgreSQL Kubernetes manifests under `k8s/`
 - a Docker-based MinIO AIStor reference doc under `docs/`
 
 If you are looking for the actively maintained manifests, start with [k8s/README.md](/home/jimoney/homelab/k8s/README.md).

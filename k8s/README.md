@@ -1,6 +1,6 @@
 # Homelab Data Stack on Kubernetes
 
-This repo is the Kubernetes layer for a small homelab data stack: MinIO for S3-compatible object storage and PostgreSQL for app data and backups.
+This repo is the Kubernetes layer for a small homelab data stack: MinIO for S3-compatible object storage, PostgreSQL for app data and backups, and Kavita for self-hosted digital library management.
 
 It is intentionally simple:
 
@@ -18,6 +18,7 @@ kubectl apply -k .
 If you want one service only:
 
 ```bash
+kubectl apply -k kavita
 kubectl apply -k minio
 kubectl apply -k psql
 ```
@@ -28,6 +29,14 @@ kubectl apply -k psql
 .
 ├── README.md
 ├── kustomization.yaml
+├── kavita/
+│   ├── README.md
+│   ├── deployment.yaml
+│   ├── kavita-pvcs.yaml
+│   ├── kustomization.yaml
+│   ├── loadbalancer.yaml
+│   ├── namespace.yaml
+│   └── service.yaml
 ├── minio/
 │   ├── README.md
 │   ├── deployment.yaml
@@ -60,6 +69,18 @@ kubectl apply -k psql
   - S3 API port: `9000`
 - Secret required: `minio-env`
 
+### Kavita
+
+- Namespace: `kavita`
+- Workload: single-replica `Deployment`
+- Image: `jvmilazz0/kavita:latest`
+- Storage:
+  - `5Gi` via `local-path` for app state
+- Access:
+  - internal `ClusterIP` service: `kavita`
+  - external `LoadBalancer` service: `kavita-loadbalancer`
+  - app port: `5000`
+
 ### PostgreSQL
 
 - Namespace: `postgres`
@@ -79,14 +100,16 @@ kubectl apply -k psql
 
 ## How The Pieces Fit Together
 
-The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes two service-level kustomizations:
+The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes three service-level kustomizations:
 
+- [kavita/kustomization.yaml](/home/jimoney/homelab/k8s/kavita/kustomization.yaml)
 - [minio/kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml)
 - [psql/kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml)
 
 That means you can:
 
 - deploy everything with `kubectl apply -k .`
+- deploy the library service only with `kubectl apply -k kavita`
 - deploy storage only with `kubectl apply -k minio`
 - deploy database only with `kubectl apply -k psql`
 
@@ -139,6 +162,7 @@ Preview manifests:
 
 ```bash
 kubectl kustomize .
+kubectl kustomize kavita
 kubectl kustomize minio
 kubectl kustomize psql
 ```
@@ -146,6 +170,9 @@ kubectl kustomize psql
 Check rollout state:
 
 ```bash
+kubectl get pods -n kavita
+kubectl get svc -n kavita
+kubectl get pvc -n kavita
 kubectl get pods -n minio
 kubectl get svc -n minio
 kubectl get pods -n postgres
@@ -164,6 +191,16 @@ Then open:
 - `http://localhost:9000` for the S3 API
 - `http://localhost:9001` for the console
 
+Access Kavita locally:
+
+```bash
+kubectl port-forward svc/kavita -n kavita 5000:5000
+```
+
+Then open:
+
+- `http://localhost:5000`
+
 Connect to PostgreSQL from inside the cluster or by port-forwarding:
 
 ```bash
@@ -172,6 +209,8 @@ kubectl port-forward svc/postgres -n postgres 5432:5432
 
 ## Files Worth Knowing
 
+- [kavita/deployment.yaml](/home/jimoney/homelab/k8s/kavita/deployment.yaml) defines the Kavita workload and its persistent mounts for config and library data
+- [kavita/kavita-pvcs.yaml](/home/jimoney/homelab/k8s/kavita/kavita-pvcs.yaml) provisions the PVC for Kavita app state
 - [minio/deployment.yaml](/home/jimoney/homelab/k8s/minio/deployment.yaml) defines the MinIO `StatefulSet` and its persistent volume claim template
 - [minio/loadbalancer.yaml](/home/jimoney/homelab/k8s/minio/loadbalancer.yaml) exposes MinIO internally and through a `LoadBalancer`
 - [psql/postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml) defines the PostgreSQL pod, probes, resources, and mounted storage
@@ -182,5 +221,6 @@ kubectl port-forward svc/postgres -n postgres 5432:5432
 
 The deeper operational notes still live in the service-specific docs:
 
+- [kavita/README.md](/home/jimoney/homelab/k8s/kavita/README.md)
 - [minio/README.md](/home/jimoney/homelab/k8s/minio/README.md)
 - [psql/README.md](/home/jimoney/homelab/k8s/psql/README.md)
