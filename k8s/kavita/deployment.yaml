@@ -41,7 +41,13 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /kavita/config
+            - name: my-library
+              mountPath: /books
       volumes:
         - name: config
           persistentVolumeClaim:
             claimName: kavita-config
+        - name: my-library
+          hostPath:
+            path: /home/jimoney/library
+            type: DirectoryOrCreate

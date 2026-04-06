@@ -28,6 +28,7 @@ kavita/
 - Image: `jvmilazz0/kavita:latest`
 - Storage:
   - `kavita-config` PVC for app state
+  - host directory `/home/jimoney/library` for books and comics
 - Access:
   - internal `ClusterIP` service: `kavita`
   - external `LoadBalancer` service: `kavita-loadbalancer`
@@ -38,17 +39,51 @@ kavita/
 Kavita is not stateless. The manifests mount:
 
 - `/kavita/config` for config, metadata, users, reading progress, and internal database state
+- `/books` for the library files Kavita scans, backed by `/home/jimoney/library`
 
-This setup does not mount a host or shared library directory. Add content through Kavita itself or update the manifests later if you want a filesystem-backed library source.
+Create library directories on the host:
 
-For now, this repo assumes the Kavita web UI is the content-management path.
+```bash
+mkdir -p /home/jimoney/library/{manga,programming,manuals}
+```
 
-Typical flow after deployment:
+Then place files under paths like:
 
-1. Open Kavita in the browser.
-2. Complete initial admin setup if prompted.
-3. Use the web UI to add and manage your content.
-4. Revisit the manifests later if you want a mounted library path such as NFS or another shared storage source.
+- `/home/jimoney/library/manga`
+- `/home/jimoney/library/programming`
+- `/home/jimoney/library/manuals`
+
+In Kavita, add library paths such as:
+
+- `/books/manga`
+- `/books/programming`
+- `/books/manuals`
+
+Important: point Kavita at the parent library folder, not a book-specific folder.
+
+Good examples:
+
+- `/books/programming`
+- `/books/manga`
+
+Bad examples:
+
+- `/books/programming/rust`
+- `/books/programming/The Rust Programming Language`
+
+Kavita expects the library root to contain folders, not files directly at the root.
+
+For programming books, use a structure like:
+
+```text
+/home/jimoney/library/programming/rust/The Rust Programming Language.pdf
+```
+
+That maps to:
+
+```text
+/books/programming/rust/The Rust Programming Language.pdf
+```
 
 ## Deploy
 
@@ -80,6 +115,13 @@ kubectl describe pod -n kavita -l app=kavita
 kubectl logs -n kavita -l app=kavita
 ```
 
+Verify the mounted library is visible inside the container:
+
+```bash
+kubectl exec -n kavita deployment/kavita -- ls -la /books
+kubectl exec -n kavita deployment/kavita -- ls -la /books/programming
+```
+
 ## Access
 
 Port-forward for local access:
@@ -108,4 +150,5 @@ Then connect to:
 - This is a single-instance setup intended for homelab use
 - The image is configured without external database dependencies
 - MinIO is not used as Kavita's live runtime storage in this setup
-- No host library path is configured in this version
+- The library mount uses `hostPath` at `/home/jimoney/library`
+- If Kavita warns that a library has files at the root, move those files into a subfolder and keep the library path pointed at the parent directory

@@ -76,6 +76,7 @@ kubectl apply -k psql
 - Image: `jvmilazz0/kavita:latest`
 - Storage:
   - `5Gi` via `local-path` for app state
+  - host directory `/home/jimoney/library` for library files
 - Access:
   - internal `ClusterIP` service: `kavita`
   - external `LoadBalancer` service: `kavita-loadbalancer`
