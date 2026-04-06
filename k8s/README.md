@@ -34,20 +34,20 @@ kubectl apply -k psql
 │   ├── deployment.yaml
 │   ├── kavita-pvcs.yaml
 │   ├── kustomization.yaml
-│   ├── loadbalancer.yaml
 │   ├── namespace.yaml
+│   ├── nodeport.yaml
 │   └── service.yaml
 ├── minio/
 │   ├── README.md
 │   ├── deployment.yaml
 │   ├── kustomization.yaml
-│   ├── loadbalancer.yaml
-│   └── namespace.yaml
+│   ├── namespace.yaml
+│   └── nodeport.yaml
 ├── n8n/
 │   ├── deployment.yaml
 │   ├── kustomization.yaml
-│   ├── loadbalancer.yaml
 │   ├── namespace.yaml
+│   ├── nodeport.yaml
 │   ├── pvc.yaml
 │   └── service.yaml
 └── psql/
@@ -71,7 +71,7 @@ kubectl apply -k psql
 - Storage: `25Gi` via `local-path`
 - Access:
   - internal `ClusterIP` service: `minio`
-  - external `LoadBalancer` service: `minio-loadbalancer`
+  - external `NodePort` service: `minio-nodeport` (ports 30002/30003)
   - console port: `9001`
   - S3 API port: `9000`
 - Secret required: `minio-env`
@@ -86,7 +86,7 @@ kubectl apply -k psql
   - host directory `/home/jimoney/library` for library files
 - Access:
   - internal `ClusterIP` service: `kavita`
-  - external `LoadBalancer` service: `kavita-loadbalancer`
+  - external `NodePort` service: `kavita-nodeport` (port 30001)
   - app port: `5000`
 
 ### PostgreSQL
@@ -114,7 +114,7 @@ kubectl apply -k psql
 - Storage: `1Gi` via `local-path`
 - Access:
   - internal `ClusterIP` service: `n8n`
-  - external `LoadBalancer` service: `n8n-lb`
+  - external `NodePort` service: `n8n-nodeport` (port 30004)
   - app port: `5678`
 
 ## How The Pieces Fit Together
@@ -177,7 +177,38 @@ kubectl create secret generic postgres-auth \
   --from-literal=POSTGRES_PASSWORD='<strong-password>'
 ```
 
-## Common Commands
+## Access Services
+
+### NodePort (from any machine on network)
+
+| Service | Port | URL |
+|---------|------|-----|
+| Kavita | 30001 | `http://<host-ip>:30001` |
+| MinIO API | 30002 | `http://<host-ip>:30002` |
+| MinIO Console | 30003 | `http://<host-ip>:30003` |
+| n8n | 30004 | `http://<host-ip>:30004` |
+
+Replace `<host-ip>` with your machine's IP (e.g., `192.168.100.11`).
+
+### Port-forward (alternative)
+
+```bash
+kubectl port-forward svc/minio -n minio 9000:9000 9001:9001
+kubectl port-forward svc/kavita -n kavita 5000:5000
+kubectl port-forward svc/postgres -n postgres 5432:5432
+kubectl port-forward svc/n8n -n n8n 5678:5678
+```
+
+## Check Status
+
+Check pods and services:
+
+```bash
+kubectl get pods,svc -n kavita
+kubectl get pods,svc -n minio
+kubectl get pods,svc -n postgres
+kubectl get pods,svc -n n8n
+```
 
 Preview manifests:
 
@@ -188,65 +219,12 @@ kubectl kustomize minio
 kubectl kustomize psql
 ```
 
-Check rollout state:
-
-```bash
-kubectl get pods -n kavita
-kubectl get svc -n kavita
-kubectl get pvc -n kavita
-kubectl get pods -n minio
-kubectl get svc -n minio
-kubectl get pods -n postgres
-kubectl get svc -n postgres
-kubectl get pvc -n postgres
-kubectl get pods -n n8n
-kubectl get svc -n n8n
-kubectl get pvc -n n8n
-```
-
-Access MinIO locally:
-
-```bash
-kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000 9001:9001
-```
-
-Then open:
-
-- `http://localhost:9000` for the S3 API
-- `http://localhost:9001` for the console
-
-Access Kavita locally:
-
-```bash
-kubectl port-forward svc/kavita -n kavita 5000:5000
-```
-
-Then open:
-
-- `http://localhost:5000`
-
-Connect to PostgreSQL from inside the cluster or by port-forwarding:
-
-```bash
-kubectl port-forward svc/postgres -n postgres 5432:5432
-```
-
-Access n8n locally:
-
-```bash
-kubectl port-forward svc/n8n -n n8n 5678:5678
-```
-
-Then open:
-
-- `http://localhost:5678`
-
 ## Files Worth Knowing
 
 - [kavita/deployment.yaml](/home/jimoney/homelab/k8s/kavita/deployment.yaml) defines the Kavita workload and its persistent mounts for config and library data
 - [kavita/kavita-pvcs.yaml](/home/jimoney/homelab/k8s/kavita/kavita-pvcs.yaml) provisions the PVC for Kavita app state
 - [minio/deployment.yaml](/home/jimoney/homelab/k8s/minio/deployment.yaml) defines the MinIO `StatefulSet` and its persistent volume claim template
-- [minio/loadbalancer.yaml](/home/jimoney/homelab/k8s/minio/loadbalancer.yaml) exposes MinIO internally and through a `LoadBalancer`
+- [minio/nodeport.yaml](/home/jimoney/homelab/k8s/minio/nodeport.yaml) exposes MinIO via NodePort for external access
 - [psql/postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml) defines the PostgreSQL pod, probes, resources, and mounted storage
 - [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml) contains the database defaults plus MinIO backup settings
 - [psql/appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup currently stored in the repo
