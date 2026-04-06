@@ -22,12 +22,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: minio-loadbalancer
+  name: minio-nodeport
   namespace: minio
   labels:
     app: minio
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: minio
   ports:

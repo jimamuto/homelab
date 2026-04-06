@@ -6,5 +6,5 @@ resources:
   - kavita-pvcs.yaml
   - deployment.yaml
   - service.yaml
-  - loadbalancer.yaml
+  - nodeport.yaml
 
