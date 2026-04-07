@@ -34,12 +34,14 @@ spec:
               containerPort: 9001
           readinessProbe:
             httpGet:
+              scheme: HTTPS
               path: /minio/health/ready
               port: 9000
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
+              scheme: HTTPS
               path: /minio/health/live
               port: 9000
             initialDelaySeconds: 30
@@ -47,6 +49,19 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: certs
+              mountPath: /root/.minio/certs
+              readOnly: true
+      volumes:
+        - name: data
+        - name: certs
+          secret:
+            secretName: minio-tls
+            items:
+              - key: tls.crt
+                path: public.crt
+              - key: tls.key
+                path: private.key
   volumeClaimTemplates:
     - metadata:
         name: data
