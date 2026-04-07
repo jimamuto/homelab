@@ -6,4 +6,4 @@ resources:
   - pvc.yaml
   - service.yaml
   - nodeport.yaml
-  - secret-tls.yaml
+  - sealed-secrets.yaml
