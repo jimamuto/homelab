@@ -28,21 +28,27 @@ spec:
               containerPort: 5678
           env:
             - name: N8N_HOST
-              value: "0.0.0.0"
+              value: "n8n.fedora.tailf20727.ts.net"
             - name: N8N_PORT
               value: "5678"
             - name: N8N_PROTOCOL
-              value: "http"
+              value: "https"
             - name: WEBHOOK_URL
-              value: "http://localhost:5678"
+              value: "https://n8n.fedora.tailf20727.ts.net"
+            - name: N8N_SSL_KEY
+              value: "/home/node/certs/private.key"
+            - name: N8N_SSL_CERT
+              value: "/home/node/certs/public.crt"
           readinessProbe:
             httpGet:
+              scheme: HTTPS
               path: /
               port: 5678
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
+              scheme: HTTPS
               path: /
               port: 5678
             initialDelaySeconds: 60
@@ -57,7 +63,18 @@ spec:
           volumeMounts:
             - name: n8n-data
               mountPath: /home/node/.n8n
+            - name: n8n-certs
+              mountPath: /home/node/certs
+              readOnly: true
       volumes:
         - name: n8n-data
           persistentVolumeClaim:
             claimName: n8n-data
+        - name: n8n-certs
+          secret:
+            secretName: n8n-tls
+            items:
+              - key: tls.crt
+                path: public.crt
+              - key: tls.key
+                path: private.key
