@@ -50,15 +50,23 @@ kubectl apply -k psql
 │   ├── nodeport.yaml
 │   ├── pvc.yaml
 │   └── service.yaml
-└── psql/
+├── psql/
+│   ├── README.md
+│   ├── appdb_backup.sql
+│   ├── kustomization.yaml
+│   ├── namespace.yaml
+│   ├── postgres-configmap.yaml
+│   ├── postgres-pvc.yaml
+│   ├── postgres-services.yaml
+│   └── postgres-statefulset.yaml
+└── qbittorrent/
     ├── README.md
-    ├── appdb_backup.sql
+    ├── deployment.yaml
     ├── kustomization.yaml
     ├── namespace.yaml
-    ├── postgres-configmap.yaml
-    ├── postgres-pvc.yaml
-    ├── postgres-services.yaml
-    └── postgres-statefulset.yaml
+    ├── nodeport.yaml
+    ├── pvc.yaml
+    └── service.yaml
 ```
 
 ## Stack Overview
@@ -117,14 +125,28 @@ kubectl apply -k psql
   - external `NodePort` service: `n8n-nodeport` (port 30004)
   - app port: `5678`
 
+### qbittorrent
+
+- Namespace: `qbittorrent`
+- Workload: single-replica `Deployment`
+- Image: `lscr.io/linuxserver/qbittorrent:latest`
+- Storage:
+  - `1Gi` via `local-path` for app config
+  - host directory `/home/jimoney/downloads` for downloads
+- Access:
+  - internal `ClusterIP` service: `qbittorrent`
+  - external `NodePort` service: `qbittorrent-nodeport` (port 30005)
+  - app port: `30005`
+
 ## How The Pieces Fit Together
 
-The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes four service-level kustomizations:
+The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes five service-level kustomizations:
 
 - [kavita/kustomization.yaml](/home/jimoney/homelab/k8s/kavita/kustomization.yaml)
 - [minio/kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml)
 - [psql/kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml)
 - [n8n/kustomization.yaml](/home/jimoney/homelab/k8s/n8n/kustomization.yaml)
+- [qbittorrent/kustomization.yaml](/home/jimoney/homelab/k8s/qbittorrent/kustomization.yaml)
 
 That means you can:
 
@@ -133,6 +155,7 @@ That means you can:
 - deploy storage only with `kubectl apply -k minio`
 - deploy database only with `kubectl apply -k psql`
 - deploy automation only with `kubectl apply -k n8n`
+- deploy qbittorrent only with `kubectl apply -k qbittorrent`
 
 Operationally, PostgreSQL is already wired to know about MinIO through [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml), which includes the in-cluster MinIO endpoint and backup bucket name.
 
@@ -187,6 +210,7 @@ kubectl create secret generic postgres-auth \
 | MinIO API | 30002 | `http://<host-ip>:30002` |
 | MinIO Console | 30003 | `http://<host-ip>:30003` |
 | n8n | 30004 | `http://<host-ip>:30004` |
+| qbittorrent | 30005 | `http://<host-ip>:30005` |
 
 Replace `<host-ip>` with your machine's IP (e.g., `192.168.100.11`).
 
@@ -197,6 +221,7 @@ kubectl port-forward svc/minio -n minio 9000:9000 9001:9001
 kubectl port-forward svc/kavita -n kavita 5000:5000
 kubectl port-forward svc/postgres -n postgres 5432:5432
 kubectl port-forward svc/n8n -n n8n 5678:5678
+kubectl port-forward svc/qbittorrent -n qbittorrent 30005:30005
 ```
 
 ## Check Status
@@ -208,6 +233,7 @@ kubectl get pods,svc -n kavita
 kubectl get pods,svc -n minio
 kubectl get pods,svc -n postgres
 kubectl get pods,svc -n n8n
+kubectl get pods,svc -n qbittorrent
 ```
 
 Preview manifests:
@@ -217,6 +243,8 @@ kubectl kustomize .
 kubectl kustomize kavita
 kubectl kustomize minio
 kubectl kustomize psql
+kubectl kustomize n8n
+kubectl kustomize qbittorrent
 ```
 
 ## Files Worth Knowing
@@ -230,6 +258,7 @@ kubectl kustomize psql
 - [psql/appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup currently stored in the repo
 - [n8n/deployment.yaml](/home/jimoney/homelab/k8s/n8n/deployment.yaml) defines the n8n workflow automation workload
 - [n8n/pvc.yaml](/home/jimoney/homelab/k8s/n8n/pvc.yaml) provisions the PVC for n8n workflow data
+- [qbittorrent/deployment.yaml](/home/jimoney/homelab/k8s/qbittorrent/deployment.yaml) defines the qbittorrent workload with init container for WebUI port config
 
 ## Service Docs
 
@@ -238,3 +267,4 @@ The deeper operational notes still live in the service-specific docs:
 - [kavita/README.md](/home/jimoney/homelab/k8s/kavita/README.md)
 - [minio/README.md](/home/jimoney/homelab/k8s/minio/README.md)
 - [psql/README.md](/home/jimoney/homelab/k8s/psql/README.md)
+- [qbittorrent/README.md](/home/jimoney/homelab/k8s/qbittorrent/README.md)

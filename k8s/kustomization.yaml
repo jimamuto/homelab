@@ -6,3 +6,4 @@ resources:
   - minio
   - psql
   - n8n
+  - qbittorrent

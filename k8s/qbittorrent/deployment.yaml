@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbittorrent
+  namespace: qbittorrent
+  labels:
+    app: qbittorrent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: qbittorrent
+  template:
+    metadata:
+      labels:
+        app: qbittorrent
+    spec:
+      initContainers:
+        - name: qbittorrent-webui-config
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -lc
+            - |
+              conf="/config/qBittorrent/qBittorrent.conf"
+              mkdir -p /config/qBittorrent
+              touch "$conf"
+              awk '
+                BEGIN { pref_seen=0 }
+                {
+                  if ($0 == "[Preferences]") {
+                    if (pref_seen) next
+                    pref_seen=1
+                  }
+                  if ($0 ~ /^WebUI\\CSRFProtection=/) next
+                  if ($0 ~ /^WebUI\\HostHeaderValidation=/) next
+                  if ($0 ~ /^WebUI\\ReverseProxySupportEnabled=/) next
+                  if ($0 ~ /^WebUI\\ServerDomains=/) next
+                  if ($0 ~ /^WebUI\\Port=/) next
+                  print
+                }
+              ' "$conf" > "$conf.clean"
+              if grep -q '^\[Preferences\]$' "$conf.clean"; then
+                awk '
+                  BEGIN { inserted=0 }
+                  {
+                    print
+                    if (!inserted && $0 == "[Preferences]") {
+                      print "WebUI\\Port=30005"
+                      inserted=1
+                    }
+                  }
+                ' "$conf.clean" > "$conf"
+              else
+                cat "$conf.clean" > "$conf"
+                printf '\n[Preferences]\nWebUI\\Port=30005\n' >> "$conf"
+              fi
+              rm -f "$conf.clean"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      containers:
+        - name: qbittorrent
+          image: lscr.io/linuxserver/qbittorrent:latest
+          ports:
+            - name: http
+              containerPort: 30005
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "UTC"
+            - name: WEBUI_PORT
+              value: "30005"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 30005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 30005
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: downloads
+              mountPath: /downloads
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: qbittorrent-config
+        - name: downloads
+          hostPath:
+            path: /home/jimoney/downloads
+            type: DirectoryOrCreate
