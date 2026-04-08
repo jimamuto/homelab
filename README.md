@@ -6,7 +6,7 @@ Personal infrastructure for self-hosted services, automation, and media manageme
 
 | Service | Purpose | Port |
 |---------|---------|------|
-| Kavita | Digital library for manga/comics | 5000 |
+| Kavita | Digital library for comics | 5000 |
 | MinIO | S3-compatible object storage | 9000/9001 |
 | PostgreSQL | Database for apps | 5432 |
 | n8n | Workflow automation | 5678 |
@@ -15,13 +15,13 @@ Personal infrastructure for self-hosted services, automation, and media manageme
 
 Deploy everything:
 ```bash
-kubectl apply -k k8s
+kubectl apply -k k3s
 ```
 
 Deploy one service:
 ```bash
-kubectl apply -k k8s/kavita
-kubectl apply -k k8n/n8n
+kubectl apply -k k3s/kavita
+kubectl apply -k k3s/n8n
 ```
 
 ## Access Services
@@ -39,7 +39,7 @@ kubectl port-forward svc/n8n -n n8n 5678:5678          # http://localhost:5678
 - Connect RSS feeds → n8n → qBittorrent → Kavita workflow
 - Set up automated library scanning
 
-See [k8s/README.md](k8s/README.md) for full details.
+See [k3s/README.md](k3s/README.md) for full details.
 
 ## Secrets Management
 
@@ -68,13 +68,13 @@ Without this key, sealed secrets become unrecoverable if the cluster is rebuilt.
 kubectl create secret generic my-secret -n myns --from-literal=key=value -o yaml > temp-secret.yaml
 
 # 2. Encrypt it (requires kubeseal installed)
-kubeseal --cert ~/backup/sealed-secrets/sealed-secrets-cert.pem -n myns -o yaml < temp-secret.yaml > k8s/myns/sealed-secrets.yaml
+kubeseal --cert ~/backup/sealed-secrets/sealed-secrets-cert.pem -n myns -o yaml < temp-secret.yaml > k3s/myns/sealed-secrets.yaml
 
 # 3. Add to kustomization.yaml
-echo "  - sealed-secrets.yaml" >> k8s/myns/kustomization.yaml
+echo "  - sealed-secrets.yaml" >> k3s/myns/kustomization.yaml
 
 # 4. Apply
-kubectl apply -k k8s/myns
+kubectl apply -k k3s/myns
 ```
 
 ### Restoring After Cluster Rebuild

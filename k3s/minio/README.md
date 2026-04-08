@@ -111,11 +111,11 @@ Whether the external IP is reachable depends on the cluster and host networking.
 
 ## Kustomize Contents
 
-[kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml) includes:
+[kustomization.yaml](/home/jimoney/homelab/k3s/minio/kustomization.yaml) includes:
 
-- [namespace.yaml](/home/jimoney/homelab/k8s/minio/namespace.yaml)
-- [deployment.yaml](/home/jimoney/homelab/k8s/minio/deployment.yaml)
-- [loadbalancer.yaml](/home/jimoney/homelab/k8s/minio/loadbalancer.yaml)
+- [namespace.yaml](/home/jimoney/homelab/k3s/minio/namespace.yaml)
+- [deployment.yaml](/home/jimoney/homelab/k3s/minio/deployment.yaml)
+- [loadbalancer.yaml](/home/jimoney/homelab/k3s/minio/loadbalancer.yaml)
 
 ## Notes
 

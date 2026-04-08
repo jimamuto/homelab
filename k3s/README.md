@@ -1,4 +1,4 @@
-# Homelab Data Stack on Kubernetes
+# Homelab Data Stack on k3s
 
 This repo is the Kubernetes layer for a small homelab data stack: MinIO for S3-compatible object storage, PostgreSQL for app data and backups, Kavita for self-hosted digital library management, and n8n for workflow automation.
 
@@ -140,13 +140,13 @@ kubectl apply -k psql
 
 ## How The Pieces Fit Together
 
-The root [kustomization.yaml](/home/jimoney/homelab/k8s/kustomization.yaml) composes five service-level kustomizations:
+The root [kustomization.yaml](/home/jimoney/homelab/k3s/kustomization.yaml) composes five service-level kustomizations:
 
-- [kavita/kustomization.yaml](/home/jimoney/homelab/k8s/kavita/kustomization.yaml)
-- [minio/kustomization.yaml](/home/jimoney/homelab/k8s/minio/kustomization.yaml)
-- [psql/kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml)
-- [n8n/kustomization.yaml](/home/jimoney/homelab/k8s/n8n/kustomization.yaml)
-- [qbittorrent/kustomization.yaml](/home/jimoney/homelab/k8s/qbittorrent/kustomization.yaml)
+- [kavita/kustomization.yaml](/home/jimoney/homelab/k3s/kavita/kustomization.yaml)
+- [minio/kustomization.yaml](/home/jimoney/homelab/k3s/minio/kustomization.yaml)
+- [psql/kustomization.yaml](/home/jimoney/homelab/k3s/psql/kustomization.yaml)
+- [n8n/kustomization.yaml](/home/jimoney/homelab/k3s/n8n/kustomization.yaml)
+- [qbittorrent/kustomization.yaml](/home/jimoney/homelab/k3s/qbittorrent/kustomization.yaml)
 
 That means you can:
 
@@ -157,7 +157,7 @@ That means you can:
 - deploy automation only with `kubectl apply -k n8n`
 - deploy qbittorrent only with `kubectl apply -k qbittorrent`
 
-Operationally, PostgreSQL is already wired to know about MinIO through [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml), which includes the in-cluster MinIO endpoint and backup bucket name.
+Operationally, PostgreSQL is already wired to know about MinIO through [psql/postgres-configmap.yaml](/home/jimoney/homelab/k3s/psql/postgres-configmap.yaml), which includes the in-cluster MinIO endpoint and backup bucket name.
 
 ## Prerequisites
 
@@ -249,22 +249,22 @@ kubectl kustomize qbittorrent
 
 ## Files Worth Knowing
 
-- [kavita/deployment.yaml](/home/jimoney/homelab/k8s/kavita/deployment.yaml) defines the Kavita workload and its persistent mounts for config and library data
-- [kavita/kavita-pvcs.yaml](/home/jimoney/homelab/k8s/kavita/kavita-pvcs.yaml) provisions the PVC for Kavita app state
-- [minio/deployment.yaml](/home/jimoney/homelab/k8s/minio/deployment.yaml) defines the MinIO `StatefulSet` and its persistent volume claim template
-- [minio/nodeport.yaml](/home/jimoney/homelab/k8s/minio/nodeport.yaml) exposes MinIO via NodePort for external access
-- [psql/postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml) defines the PostgreSQL pod, probes, resources, and mounted storage
-- [psql/postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml) contains the database defaults plus MinIO backup settings
-- [psql/appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup currently stored in the repo
-- [n8n/deployment.yaml](/home/jimoney/homelab/k8s/n8n/deployment.yaml) defines the n8n workflow automation workload
-- [n8n/pvc.yaml](/home/jimoney/homelab/k8s/n8n/pvc.yaml) provisions the PVC for n8n workflow data
-- [qbittorrent/deployment.yaml](/home/jimoney/homelab/k8s/qbittorrent/deployment.yaml) defines the qbittorrent workload with init container for WebUI port config
+- [kavita/deployment.yaml](/home/jimoney/homelab/k3s/kavita/deployment.yaml) defines the Kavita workload and its persistent mounts for config and library data
+- [kavita/kavita-pvcs.yaml](/home/jimoney/homelab/k3s/kavita/kavita-pvcs.yaml) provisions the PVC for Kavita app state
+- [minio/deployment.yaml](/home/jimoney/homelab/k3s/minio/deployment.yaml) defines the MinIO `StatefulSet` and its persistent volume claim template
+- [minio/nodeport.yaml](/home/jimoney/homelab/k3s/minio/nodeport.yaml) exposes MinIO via NodePort for external access
+- [psql/postgres-statefulset.yaml](/home/jimoney/homelab/k3s/psql/postgres-statefulset.yaml) defines the PostgreSQL pod, probes, resources, and mounted storage
+- [psql/postgres-configmap.yaml](/home/jimoney/homelab/k3s/psql/postgres-configmap.yaml) contains the database defaults plus MinIO backup settings
+- [psql/appdb_backup.sql](/home/jimoney/homelab/k3s/psql/appdb_backup.sql) is the SQL backup currently stored in the repo
+- [n8n/deployment.yaml](/home/jimoney/homelab/k3s/n8n/deployment.yaml) defines the n8n workflow automation workload
+- [n8n/pvc.yaml](/home/jimoney/homelab/k3s/n8n/pvc.yaml) provisions the PVC for n8n workflow data
+- [qbittorrent/deployment.yaml](/home/jimoney/homelab/k3s/qbittorrent/deployment.yaml) defines the qbittorrent workload with init container for WebUI port config
 
 ## Service Docs
 
 The deeper operational notes still live in the service-specific docs:
 
-- [kavita/README.md](/home/jimoney/homelab/k8s/kavita/README.md)
-- [minio/README.md](/home/jimoney/homelab/k8s/minio/README.md)
-- [psql/README.md](/home/jimoney/homelab/k8s/psql/README.md)
-- [qbittorrent/README.md](/home/jimoney/homelab/k8s/qbittorrent/README.md)
+- [kavita/README.md](/home/jimoney/homelab/k3s/kavita/README.md)
+- [minio/README.md](/home/jimoney/homelab/k3s/minio/README.md)
+- [psql/README.md](/home/jimoney/homelab/k3s/psql/README.md)
+- [qbittorrent/README.md](/home/jimoney/homelab/k3s/qbittorrent/README.md)

@@ -30,7 +30,7 @@ psql/
 - Secret dependency: `postgres-auth`
 - ConfigMap: `postgres-config`
 
-Current config values from [postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml):
+Current config values from [postgres-configmap.yaml](/home/jimoney/homelab/k3s/psql/postgres-configmap.yaml):
 
 - `POSTGRES_DB=appdb`
 - `POSTGRES_USER=appuser`
@@ -136,13 +136,13 @@ Reconnect and verify the row count is still there.
 
 ## Kustomize Contents
 
-[kustomization.yaml](/home/jimoney/homelab/k8s/psql/kustomization.yaml) includes:
+[kustomization.yaml](/home/jimoney/homelab/k3s/psql/kustomization.yaml) includes:
 
-- [namespace.yaml](/home/jimoney/homelab/k8s/psql/namespace.yaml)
-- [postgres-configmap.yaml](/home/jimoney/homelab/k8s/psql/postgres-configmap.yaml)
-- [postgres-pvc.yaml](/home/jimoney/homelab/k8s/psql/postgres-pvc.yaml)
-- [postgres-services.yaml](/home/jimoney/homelab/k8s/psql/postgres-services.yaml)
-- [postgres-statefulset.yaml](/home/jimoney/homelab/k8s/psql/postgres-statefulset.yaml)
+- [namespace.yaml](/home/jimoney/homelab/k3s/psql/namespace.yaml)
+- [postgres-configmap.yaml](/home/jimoney/homelab/k3s/psql/postgres-configmap.yaml)
+- [postgres-pvc.yaml](/home/jimoney/homelab/k3s/psql/postgres-pvc.yaml)
+- [postgres-services.yaml](/home/jimoney/homelab/k3s/psql/postgres-services.yaml)
+- [postgres-statefulset.yaml](/home/jimoney/homelab/k3s/psql/postgres-statefulset.yaml)
 
 ## Notes
 
@@ -150,7 +150,7 @@ Reconnect and verify the row count is still there.
 - Resource requests are `250m` CPU and `512Mi` memory
 - Resource limits are `1` CPU and `1Gi` memory
 - Readiness and liveness probes both use `pg_isready`
-- The checked-in [appdb_backup.sql](/home/jimoney/homelab/k8s/psql/appdb_backup.sql) is the SQL backup artifact currently stored in this directory
+- The checked-in [appdb_backup.sql](/home/jimoney/homelab/k3s/psql/appdb_backup.sql) is the SQL backup artifact currently stored in this directory
 
 ## Troubleshooting
 
