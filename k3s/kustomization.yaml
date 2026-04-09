@@ -7,3 +7,5 @@ resources:
   - psql
   - n8n
   - qbittorrent
+  - paperless
+  - redis

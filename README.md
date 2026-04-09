@@ -6,10 +6,13 @@ Personal infrastructure for self-hosted services, automation, and media manageme
 
 | Service | Purpose | Port |
 |---------|---------|------|
-| Kavita | Digital library for comics | 5000 |
-| MinIO | S3-compatible object storage | 9000/9001 |
-| PostgreSQL | Database for apps | 5432 |
-| n8n | Workflow automation | 5678 |
+| Kavita | Digital comics/manga library | 30005 |
+| MinIO | S3-compatible object storage | 30002 |
+| PostgreSQL | Database for apps | (internal) |
+| n8n | Workflow automation | 30004 |
+| qBittorrent | Torrent client | 30003 |
+| **Paperless** | Document management (PDFs) | **30008** |
+| **Redis** | Cache/Message queue | (internal) |
 
 ## Quick Start
 
@@ -22,24 +25,73 @@ Deploy one service:
 ```bash
 kubectl apply -k k3s/kavita
 kubectl apply -k k3s/n8n
+kubectl apply -k k3s/paperless
 ```
 
 ## Access Services
 
+| Service | URL |
+|---------|-----|
+| Kavita | http://localhost:30005 |
+| MinIO | http://localhost:30002 |
+| n8n | https://localhost:30004 |
+| qBittorrent | http://localhost:30003 |
+| **Paperless** | **http://localhost:30008** |
+
+Port-forward examples:
 ```bash
-kubectl port-forward svc/kavita -n kavita 5000:5000     # http://localhost:5000
-kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000 9001:9001  # API:9000, Console:9001
-kubectl port-forward svc/postgres -n postgres 5432:5432
-kubectl port-forward svc/n8n -n n8n 5678:5678          # http://localhost:5678
+kubectl port-forward svc/kavita -n kavita 5000:5000
+kubectl port-forward svc/minio-loadbalancer -n minio 9000:9000
+kubectl port-forward svc/paperless-nodeport -n paperless 8000:8000
 ```
+
+## Services Overview
+
+### Paperless (Document Management)
+- **Port**: 30008
+- **Purpose**: Scan, index, and archive documents
+- **Storage**: 10GB data + 20GB consume folder
+- **Docs**: [k3s/paperless/README.md](k3s/paperless/README.md)
+
+### Kavita (Media Server)
+- **Port**: 30005
+- **Purpose**: Comics, manga, and ebook reader
+- **Storage**: Host path at `/home/jimoney/library`
+
+### n8n (Automation)
+- **Port**: 30004 (HTTPS)
+- **Purpose**: Workflow automation
+- **Uses**: PostgreSQL, Redis
+
+### qBittorrent
+- **Port**: 30003
+- **Purpose**: Torrent downloads
+
+### MinIO
+- **Port**: 30002
+- **Purpose**: S3-compatible storage
+
+### PostgreSQL
+- **Internal**: postgres.postgres.svc.cluster.local:5432
+- **Purpose**: Database for n8n and other apps
+
+### Redis
+- **Internal**: redis.redis.svc.cluster.local:6379
+- **Purpose**: Task queue for Paperless
+
+## Documentation
+
+- [Homelab Overview](docs/homelab.md) - Full cluster documentation
+- [Paperless Setup](k3s/paperless/README.md) - Document management guide
+- [Kavita Setup](k3s/kavita/README.md) - Library configuration
 
 ## What's Next
 
-- Add qBittorrent for automated downloads
 - Connect RSS feeds → n8n → qBittorrent → Kavita workflow
 - Set up automated library scanning
+- Configure paperless email ingestion
 
-See [k3s/README.md](k3s/README.md) for full details.
+See [docs/homelab.md](docs/homelab.md) for full details.
 
 ## Secrets Management
 

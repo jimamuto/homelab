@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless
+  namespace: paperless
+  labels:
+    app: paperless
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless
+  template:
+    metadata:
+      labels:
+        app: paperless
+    spec:
+      initContainers:
+        - name: init-db
+          image: postgres:16
+          command:
+            - sh
+            - -c
+            - |
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "SELECT 1 FROM pg_database WHERE datname = 'paperless'" | grep -q 1 || PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "CREATE DATABASE paperless;"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "DROP ROLE IF EXISTS paperless;"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "CREATE USER paperless WITH PASSWORD 'paperless-password' LOGIN;"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "ALTER USER paperless WITH PASSWORD 'paperless-password';"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d appdb -c "GRANT ALL PRIVILEGES ON DATABASE paperless TO paperless;"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d paperless -c "ALTER USER paperless WITH PASSWORD 'paperless-password';"
+              PGPASSWORD=$(cat /pg-secrets/password) psql -h postgres.postgres.svc.cluster.local -U appuser -d paperless -c "GRANT ALL ON SCHEMA public TO paperless;"
+          volumeMounts:
+            - name: secret-volume
+              mountPath: /secrets
+            - name: pg-secrets
+              mountPath: /pg-secrets
+      containers:
+        - name: paperless
+          image: ghcr.io/paperless-ngx/paperless-ngx:latest
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: PAPERLESS_DBENGINE
+              value: "sqlite"
+            - name: PAPERLESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-auth
+                  key: secret-key
+            - name: PAPERLESS_TIME_ZONE
+              value: "America/New_York"
+            - name: PAPERLESS_REDIS
+              value: "redis://redis.redis.svc.cluster.local:6379"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: paperless-data
+              mountPath: /usr/src/paperless/data
+            - name: paperless-consume
+              mountPath: /usr/src/paperless/consume
+            - name: secret-volume
+              mountPath: /secrets
+              readOnly: true
+            - name: pg-secrets
+              mountPath: /pg-secrets
+              readOnly: true
+      volumes:
+        - name: paperless-data
+          persistentVolumeClaim:
+            claimName: paperless-data
+        - name: paperless-consume
+          persistentVolumeClaim:
+            claimName: paperless-consume
+        - name: secret-volume
+          secret:
+            secretName: paperless-auth
+        - name: pg-secrets
+          secret:
+            secretName: postgres-auth

@@ -1,2 +1,3 @@
 library/
 .codex
+k3s/*/secret.yaml
