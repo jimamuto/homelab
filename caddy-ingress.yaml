@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: caddy
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: caddy
+spec:
+  rules:
+  - host: fedora.tailf20727.ts.net
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: caddy
+            port:
+              number: 80

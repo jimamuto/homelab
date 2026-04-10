@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-svc
+  namespace: kube-system
+  labels:
+    app: caddy
+spec:
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 10.43.68.94
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ports:
+  - name: web
+    nodePort: 32090
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  - name: websecure
+    nodePort: 31929
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector:
+    app: caddy
+  sessionAffinity: None
+  type: LoadBalancer

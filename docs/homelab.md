@@ -14,17 +14,30 @@ kubectl apply -k k3s/
 kubectl get pods -A
 ```
 
+### Access via Tailscale
+
+All services are accessible via the Tailscale domain: `fedora.tailf20727.ts.net`
+
+Services route based on Host header:
+```
+kavita.fedora.tailf20727.ts.net     -> Kavita
+minio.fedora.tailf20727.ts.net      -> MinIO
+n8n.fedora.tailf20727.ts.net       -> n8n
+paperless.fedora.tailf20727.ts.net  -> Paperless
+qbittorrent.fedora.tailf20727.ts.net -> qBittorrent
+```
+
 ## Services
 
-| Service | Namespace | Port | Description |
-|---------|-----------|------|-------------|
-| **Paperless** | paperless | 30008 | Document management (PDFs, documents) |
-| **Kavita** | kavita | 30005 | Comics/Manga/Books reader |
-| **n8n** | n8n | 30004 | Workflow automation |
-| **qBittorrent** | qbittorrent | 30003 | Torrent client |
-| **MinIO** | minio | 30002 | S3-compatible object storage |
-| **PostgreSQL** | postgres | 5432 | Database |
-| **Redis** | redis | 6379 | Cache/Message queue |
+| Service | Namespace | Tailscale Domain | NodePort | Description |
+|---------|-----------|------------------------|--------|-------------|
+| **Paperless** | paperless | paperless.fedora.tailf20727.ts.net | 30008 | Document management (PDFs) |
+| **Kavita** | kavita | kavita.fedora.tailf20727.ts.net | 30005 | Comics/Manga/Books reader |
+| **n8n** | n8n | n8n.fedora.tailf20727.ts.net | 30004 | Workflow automation |
+| **qBittorrent** | qbittorrent | qbittorrent.fedora.tailf20727.ts.net | 30003 | Torrent client |
+| **MinIO** | minio | minio.fedora.tailf20727.ts.net | 30002 | S3-compatible storage |
+| **PostgreSQL** | postgres | - | - | Database (internal) |
+| **Redis** | redis | - | - | Cache (internal) |
 
 ## Detailed Setup
 
@@ -200,6 +213,12 @@ k3s/
 └── redis/                      # Cache
     ├── deployment.yaml
     └── kustomization.yaml
+
+# Ingress (in repo root, applied manually)
+caddy-deployment.yaml          # Caddy deployment
+caddy-configmap.yaml           # Caddy Caddyfile config
+caddy-service.yaml            # LoadBalancer service
+traefik-service.yaml         # Caddy LoadBalancer service (legacy name)
 ```
 
 ## Troubleshooting
@@ -255,6 +274,73 @@ kubectl get secrets -n <namespace>
 - All services use ClusterIP for internal communication
 - NodePort used for external access (30000-32767 range)
 - Service discovery via DNS: `<service>.<namespace>.svc.cluster.local`
+
+## Ingress (Caddy)
+
+### Overview
+
+The cluster uses **Caddy** as the ingress controller instead of Traefik. Caddy automatically handles TLS with self-signed certificates (internal CA).
+
+### Access
+
+| URL | Service |
+|-----|--------|
+| `http://fedora.tailf20727.ts.net` | Kavita (default) |
+| `http://kavita.fedora.tailf20727.ts.net` | Kavita |
+| `http://minio.fedora.tailf20727.ts.net` | MinIO |
+| `http://n8n.fedora.tailf20727.ts.net` | n8n |
+| `http://paperless.fedora.tailf20727.ts.net` | Paperless |
+| `http://qbittorrent.fedora.tailf20727.ts.net` | qBittorrent |
+
+Direct IP access: `http://192.168.100.11`
+
+### Components
+
+```bash
+# Caddy deployment
+kubectl get deployment caddy -n kube-system
+
+# Caddy service (LoadBalancer)
+kubectl get svc caddy-lb -n kube-system
+
+# Caddy ConfigMap (routing rules)
+kubectl get configmap caddy-caddyfile -n kube-system
+```
+
+### Configuration
+
+The Caddy Caddyfile is stored in a ConfigMap and controls routing. To modify routes:
+
+```bash
+# Edit the Caddyfile ConfigMap
+kubectl edit configmap caddy-caddyfile -n kube-system
+
+# Restart Caddy to apply changes
+kubectl rollout restart deployment caddy -n kube-system
+```
+
+### TLS Certificates
+
+Currently using self-signed certificates (`tls internal`). To enable Let's Encrypt:
+
+1. **HTTP-01 Challenge**: Open port 80 on the node
+2. **DNS-01 Challenge**: Configure DNS provider (Cloudflare, Route53, etc.)
+
+### Troubleshooting
+
+```bash
+# Check Caddy logs
+kubectl logs -n kube-system -l app=caddy
+
+# Check Caddy pod status
+kubectl get pods -n kube-system -l app=caddy
+
+# Restart Caddy
+kubectl rollout restart deployment caddy -n kube-system
+
+# Test routing
+curl -H "Host: kavita.fedora.tailf20727.ts.net" http://192.168.100.11
+```
 
 ## Adding New Services
 
